@@ -1,0 +1,633 @@
+{
+  "configuration": {
+    "ds": 0.5,
+    "steps_year": 252,
+    "smax": 600.0,
+    "paths": 10000,
+    "profile_paths": 10000,
+    "seed": 4550643,
+    "rcond": 1e-10,
+    "min_scenario_price": 1e-08,
+    "loss_tolerance": 1e-05,
+    "spread": 0.002,
+    "coupon_mode": "flat",
+    "include_unwind": true,
+    "dpi": 150,
+    "profile_spots": 17,
+    "profile_times_year": 4,
+    "csv_compression": "gzip",
+    "trace_runs": "main"
+  },
+  "assumptions": [
+    "r=q=0: interest rates and dividends are not specified in the paper; costs are not discounted.",
+    "Initial spot 100; vanilla prices in index points; note notional 1.",
+    "PDE: uniform S grid, Crank-Nicolson, two implicit Euler half-steps after payoffs/events (Rannacher smoothing).",
+    "Boundaries: asymptotic values at S=0 and S=Smax; no separately calibrated boundary model.",
+    "Cash digital pays 1; terminal value 0.5 exactly at the strike (cell averaging).",
+    "Autocall PDE: average the left and right limits at jump nodes ONLY for backward propagation; event grids and Monte Carlo retain the exact contractual redemption.",
+    "Autocall: annual observations with S>=100, FINAL European barrier S<70; payoff S/100 below 70, 1 between 70 and 100, and 1+coupon above 100.",
+    "The monitoring convention and barrier formula in Figure 6 are ambiguous; the final European barrier follows the text of Section 3.4.",
+    "Section 3: snowball coupons 10/20/30%; Section 4: FIXED 3% rebate by default; coupon_mode='snowball' applies 3% per elapsed year.",
+    "Section 3 bumps: epsilon=0.01*sigma (0.003 at 30%, 0.002 at 20%); Section 4: ABSOLUTE parallel bump 0.01.",
+    "Sensitivities use FORWARD bumps as in Algorithm 1; central differences do not replace the paper's method.",
+    "Two purely time-dependent shifts and same-maturity vanilla options have rank 1 in the infinitesimal limit: the second rank under finite bumps depends on nonlinearity.",
+    "SVD pseudoinverse with configurable rcond; no cap on weights; unidentifiable points are masked and diagnostics are saved.",
+    "Theoretical figures: absolute minimum singular value 1e-8 for identifiability; robustness ratios displayed only for |price change|>=1e-6 (Figure 5) or 1e-5 (Figure 9). Source grids and ratios before the denominator mask are saved.",
+    "Source discrepancy: Figure 5(c) in the PDF shows mostly positive residuals; with the printed formula and parameters, the code and an independent quadrature give negative values. The sign has not been changed.",
+    "Robustness bumps are anchored at t0=0, S0=100, consistent with Algorithm 1 grids; log(S/100) is regularized only at the S=0 boundary.",
+    "The 0.1 bp threshold applies to the maximum residual of PRICE CHANGES under the bumps, not to derivatives per unit of volatility.",
+    "MC: 252 business days/year; daily log-Euler for LV; exact lognormal steps for constant sigma; explicit seed, no antithetic sampling.",
+    "Prices and finite differences are interpolated linearly BEFORE solving the hedge; states before and after an autocall event are stored separately.",
+    "Initial hedge w=A^+b; subsequent hedges w_new=w_old+A^+(b-Aw_old); initial hedging cost is excluded.",
+    "Hedge liquidation at early autocall is included by default; include_unwind=False excludes it. No transaction cost is charged at the natural expiry of vanilla options.",
+    "The 20 bp spread is interpreted as the mid-to-execution distance in absolute volatility: cost=0.002*gross_decimal_vega.",
+    "Cost vega: response to the selected parallel scenario divided by 0.01 (local by default; recalibrated implied with deformation_space='implied'); this explicit convention is not fully specified by the authors.",
+    "Aggregate quadratic cost: 0.002*Q^2/Qstar, Q=sum_j |dw_j|*|vega_j|; not the sum of squared individual-instrument amounts.",
+    "Qstar is the mean absolute daily change in exotic vega over paths alive at the start of the step, including termination; estimated with an independent pilot run.",
+    "Qstar remains fixed when hedging frequency changes; option contracts and autocall observation dates are unchanged by the rehedging frequency.",
+    "FHC(t,S): a fresh valuation conditional on the note being alive; the initial cost of the new hedge is excluded also at t>0.",
+    "MC beyond Smax: asymptotic sensitivities are zero and occurrences are counted in the report; simulated paths are not clipped.",
+    "Monte Carlo intervals: mean +/-1.96*SE, descriptive; they exclude PDE, model and calibration errors.",
+    "FHC curves are evaluated at a declared number of points, connected for display; original chart values are not digitized.",
+    "Dupire extension: deterministic local volatility extracted from total implied variance, not a two-factor stochastic local-volatility model.",
+    "Dupire CSV: maturity in years, strike in the units of the supplied spot, implied_vol in decimals; a complete rectangular grid. The engine retains r=q=0.",
+    "Dupire: cubic interpolation of total variance; analytic spline derivatives; numerical calendar and butterfly checks on a dense grid, without a global guarantee.",
+    "Dupire: explicit continuation before the first maturity and outside the strike range; negative variances are not automatically repaired. Vanilla repricing is saved separately.",
+    "Default deformations act on LOCAL volatility to retain the paper's choice; deformation_space='implied' permits implied-volatility bumps followed by a new Dupire extraction."
+  ],
+  "source": "https://ssrn.com/abstract=4550643",
+  "source_date": "2023-08-24",
+  "python": "3.10.11",
+  "versions": {
+    "numpy": "1.26.2",
+    "scipy": "1.15.3",
+    "matplotlib": "3.10.9"
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "expired_call_post_event_ds_1.0",
+        "passed": true,
+        "detail": {
+          "max": 0.0
+        }
+      },
+      {
+        "name": "autocall_redemption_ds_1.0",
+        "passed": true,
+        "detail": {
+          "values": [
+            1.1,
+            1.1
+          ]
+        }
+      },
+      {
+        "name": "expired_call_post_event_ds_0.5",
+        "passed": true,
+        "detail": {
+          "max": 0.0
+        }
+      },
+      {
+        "name": "autocall_redemption_ds_0.5",
+        "passed": true,
+        "detail": {
+          "values": [
+            1.1,
+            1.1
+          ]
+        }
+      },
+      {
+        "name": "mesh_convergence_all_products",
+        "passed": true,
+        "detail": {
+          "coarse_errors": [
+            0.001103038759783459,
+            1.7559330959482367e-05,
+            0.0007304218740173951,
+            3.065345423236554e-05
+          ],
+          "fine_errors": [
+            0.00027574064097279916,
+            4.389294453954751e-06,
+            0.00018260441306239272,
+            7.662906740257824e-06
+          ]
+        }
+      },
+      {
+        "name": "pricing_absolute_tolerances",
+        "passed": true,
+        "detail": {
+          "fine_errors": [
+            0.00027574064097279916,
+            4.389294453954751e-06,
+            0.00018260441306239272,
+            7.662906740257824e-06
+          ]
+        }
+      },
+      {
+        "name": "minimum_change_constraint",
+        "passed": true,
+        "detail": {
+          "max_residual": 3.552713678800501e-15
+        }
+      },
+      {
+        "name": "minimum_change_nullspace_preserved",
+        "passed": true,
+        "detail": {
+          "max_error": 6.661338147750939e-16
+        }
+      },
+      {
+        "name": "no_turnover_below_threshold",
+        "passed": true,
+        "detail": {}
+      },
+      {
+        "name": "svd_weight_orientation",
+        "passed": true,
+        "detail": {
+          "max_error": 9.706124792785431e-14
+        }
+      },
+      {
+        "name": "cash_vega_units_20000_eur_to_4000_eur",
+        "passed": true,
+        "detail": {
+          "cost_eur": 4000.0
+        }
+      },
+      {
+        "name": "cost_calibration_crossover",
+        "passed": true,
+        "detail": {}
+      },
+      {
+        "name": "same_expiry_gateaux_rank_one",
+        "passed": true,
+        "detail": {
+          "singular_values": [
+            85.96089827503455,
+            2.4838297655583333e-15
+          ]
+        }
+      },
+      {
+        "name": "figure5c_printed_setup_negative_residual",
+        "passed": true,
+        "detail": {
+          "note": "This verifies the printed setup, not agreement with the published positive-looking surface."
+        }
+      }
+    ],
+    "pricing": [
+      {
+        "ds": 1.0,
+        "steps_per_year": 126,
+        "products": [
+          "call",
+          "digital",
+          "upin",
+          "autocall"
+        ],
+        "pde": [
+          16.798494103976576,
+          0.4160195736172777,
+          16.631627653594272,
+          0.9498476877846019
+        ],
+        "independent_reference": [
+          16.79959714273636,
+          0.4160020142863182,
+          16.63235807546829,
+          0.9498170343303696
+        ],
+        "absolute_error": [
+          0.001103038759783459,
+          1.7559330959482367e-05,
+          0.0007304218740173951,
+          3.065345423236554e-05
+        ]
+      },
+      {
+        "ds": 0.5,
+        "steps_per_year": 252,
+        "products": [
+          "call",
+          "digital",
+          "upin",
+          "autocall"
+        ],
+        "pde": [
+          16.799321402095387,
+          0.4160064035807722,
+          16.632175471055227,
+          0.9498246972371098
+        ],
+        "independent_reference": [
+          16.79959714273636,
+          0.4160020142863182,
+          16.63235807546829,
+          0.9498170343303696
+        ],
+        "absolute_error": [
+          0.00027574064097279916,
+          4.389294453954751e-06,
+          0.00018260441306239272,
+          7.662906740257824e-06
+        ]
+      }
+    ],
+    "figure5c_independent_reference_and_source_discrepancy": [
+      {
+        "time": 0.0,
+        "spot": 100,
+        "residual_percent": -0.20325888077184684,
+        "hedge_weight": 1.2446515830041225
+      },
+      {
+        "time": 1.0,
+        "spot": 100,
+        "residual_percent": -0.5074292186858637,
+        "hedge_weight": 1.7700009603444307
+      }
+    ],
+    "passed": true
+  },
+  "section3": {
+    "fig01": {
+      "total_nodes": 606505,
+      "identifiable_nodes": 371095,
+      "masked_nodes": 235410,
+      "minimum_retained_singular_value_absolute": 1e-08,
+      "condition_median": 2113.137627469488,
+      "condition_max": 1637744.5926940262,
+      "max_scenario_residual": 1.6653345369377348e-16
+    },
+    "call_spread_weight_max_abs_error_central": 1.0464638444673824e-07,
+    "fig02": {
+      "total_nodes": 606505,
+      "identifiable_nodes": 452228,
+      "masked_nodes": 154277,
+      "minimum_retained_singular_value_absolute": 1e-08,
+      "condition_median": 1.0,
+      "condition_max": 1.0,
+      "max_scenario_residual": 8.673617379884035e-19
+    },
+    "fig03": {
+      "total_nodes": 606505,
+      "identifiable_nodes": 307801,
+      "masked_nodes": 298704,
+      "minimum_retained_singular_value_absolute": 1e-08,
+      "condition_median": 14856.80717981748,
+      "condition_max": 3497985.7574768686,
+      "max_scenario_residual": 2.7755575615628914e-16
+    },
+    "fig04": {
+      "total_nodes": 606505,
+      "identifiable_nodes": 479583,
+      "masked_nodes": 126922,
+      "minimum_retained_singular_value_absolute": 1e-08,
+      "condition_median": 1.0,
+      "condition_max": 1.0,
+      "max_scenario_residual": 2.7755575615628914e-17
+    },
+    "fig08": {
+      "total_nodes": 909157,
+      "identifiable_nodes": 424946,
+      "masked_nodes": 484211,
+      "minimum_retained_singular_value_absolute": 1e-08,
+      "condition_median": 140.7607880058767,
+      "condition_max": 11287655.83412892,
+      "max_scenario_residual": 2.8189256484623115e-18
+    },
+    "autocall_price_S100_t0": 0.9498246972371098,
+    "autocall_parallel_vega_S100_t0": -0.6333506166090371,
+    "residual_ratio_display_thresholds": {
+      "figure5": 1e-06,
+      "figure9": 1e-05,
+      "raw_ratio_floor": 1e-12
+    }
+  },
+  "dupire": {
+    "unit_checks": {
+      "flat_vol_max_abs_error": 2.0183854587685346e-13,
+      "term_structure_max_abs_error": 1.6653345369377348e-15,
+      "invalid_calendar_rejected": true,
+      "demo": {
+        "model": "Dupire local volatility, not stochastic local volatility",
+        "source": {
+          "kind": "csv_implied_volatility_surface",
+          "file_name": "synthetic.csv",
+          "sha256": "11b1436fc290137707870d6f895ddbad601a9ed6b5b7a0f6c4f6524f195bc891",
+          "quote_rows": 2178,
+          "quoted_spot": 100.0,
+          "engine_spot": 100.0,
+          "rates_assumption": "r=q=0"
+        },
+        "spot": 100.0,
+        "rates_assumption": "r=q=0",
+        "surface_coordinates": "T, k=ln(K/F(T)); here F(T)=spot because r=q=0",
+        "interpolator": "RectBivariateSpline cubic total variance, s=0; not a guaranteed arbitrage-free fit",
+        "fixed_time_evaluation": "Exact tensor contraction to univariate B-splines; LRU2048; no extra spatial interpolation",
+        "maturity_range": [
+          0.01,
+          5.0
+        ],
+        "log_moneyness_range": [
+          -3.000000000000001,
+          3.0000000000000018
+        ],
+        "normalized_spot_range": [
+          4.978706836786389,
+          2008.5536923187703
+        ],
+        "nodes": [
+          18,
+          121
+        ],
+        "boundary_policy": {
+          "short_time": "w(t,k)=t*w(Tmin,k)/Tmin; exact local-vol t=0 limit",
+          "long_time": "reject t>Tmax",
+          "wings": "freeze LOCAL vol at nearest log-moneyness boundary"
+        },
+        "denominator_floor_rejection_not_clipping": 1e-08,
+        "validation": {
+          "status": "passed_finite_dense_grid_not_global_proof",
+          "tested_points": 144996,
+          "min_calendar_derivative_wT": 0.0320114129181961,
+          "min_butterfly_denominator": 0.43869209788266306,
+          "max_butterfly_denominator": 1.1605832372700156,
+          "min_local_vol": 0.169384785286005,
+          "max_local_vol": 0.5836739897308664,
+          "max_total_variance_node_interpolation_error": 2.220446049250313e-16
+        },
+        "caveat": "Dense-grid checks do not prove global arbitrage absence; boundary continuation may alter repricing and must be tested."
+      },
+      "parallel_bump": {
+        "status": "passed_finite_dense_grid_not_global_proof",
+        "tested_points": 144996,
+        "min_calendar_derivative_wT": 0.035693488813442045,
+        "min_butterfly_denominator": 0.45146846693698284,
+        "max_butterfly_denominator": 1.1562558746841891,
+        "min_local_vol": 0.17901966517338128,
+        "max_local_vol": 0.591282796643057,
+        "max_total_variance_node_interpolation_error": 3.3306690738754696e-16
+      },
+      "skew_bump": {
+        "status": "passed_finite_dense_grid_not_global_proof",
+        "tested_points": 144996,
+        "min_calendar_derivative_wT": 0.028599680382255733,
+        "min_butterfly_denominator": 0.4514591897983198,
+        "max_butterfly_denominator": 1.233771133081011,
+        "min_local_vol": 0.15757300381433909,
+        "max_local_vol": 0.5912859398338148,
+        "max_total_variance_node_interpolation_error": 2.220446049250313e-16
+      },
+      "demo_source": {
+        "kind": "synthetic_SSVI_example_not_market_data",
+        "file_name": "synthetic.csv",
+        "theta": "0.04*T+0.02*(1-exp(-T))",
+        "rho": -0.45,
+        "phi": 0.8,
+        "spot": 100.0,
+        "SSVI_sufficient_butterfly_bound_values_at_T5": [
+          0.25504367962962127,
+          0.204034943703697
+        ],
+        "bounds_apply_to": "analytic source smile on0<T<=5, not automatically to its interpolating spline"
+      }
+    },
+    "model": {
+      "model": "Dupire local volatility, not stochastic local volatility",
+      "source": {
+        "kind": "synthetic_SSVI_example_not_market_data",
+        "file_name": "synthetic_dupire_surface.csv",
+        "sha256": "11b1436fc290137707870d6f895ddbad601a9ed6b5b7a0f6c4f6524f195bc891",
+        "quote_rows": 2178,
+        "quoted_spot": 100.0,
+        "engine_spot": 100.0,
+        "rates_assumption": "r=q=0",
+        "theta": "0.04*T+0.02*(1-exp(-T))",
+        "rho": -0.45,
+        "phi": 0.8,
+        "spot": 100.0,
+        "SSVI_sufficient_butterfly_bound_values_at_T5": [
+          0.25504367962962127,
+          0.204034943703697
+        ],
+        "bounds_apply_to": "analytic source smile on0<T<=5, not automatically to its interpolating spline"
+      },
+      "spot": 100.0,
+      "rates_assumption": "r=q=0",
+      "surface_coordinates": "T, k=ln(K/F(T)); here F(T)=spot because r=q=0",
+      "interpolator": "RectBivariateSpline cubic total variance, s=0; not a guaranteed arbitrage-free fit",
+      "fixed_time_evaluation": "Exact tensor contraction to univariate B-splines; LRU2048; no extra spatial interpolation",
+      "maturity_range": [
+        0.01,
+        5.0
+      ],
+      "log_moneyness_range": [
+        -3.000000000000001,
+        3.0000000000000018
+      ],
+      "normalized_spot_range": [
+        4.978706836786389,
+        2008.5536923187703
+      ],
+      "nodes": [
+        18,
+        121
+      ],
+      "boundary_policy": {
+        "short_time": "w(t,k)=t*w(Tmin,k)/Tmin; exact local-vol t=0 limit",
+        "long_time": "reject t>Tmax",
+        "wings": "freeze LOCAL vol at nearest log-moneyness boundary"
+      },
+      "denominator_floor_rejection_not_clipping": 1e-08,
+      "validation": {
+        "status": "passed_finite_dense_grid_not_global_proof",
+        "tested_points": 144996,
+        "min_calendar_derivative_wT": 0.0320114129181961,
+        "min_butterfly_denominator": 0.43869209788266306,
+        "max_butterfly_denominator": 1.1605832372700156,
+        "min_local_vol": 0.169384785286005,
+        "max_local_vol": 0.5836739897308664,
+        "max_total_variance_node_interpolation_error": 2.220446049250313e-16
+      },
+      "caveat": "Dense-grid checks do not prove global arbitrage absence; boundary continuation may alter repricing and must be tested.",
+      "deformation_space": "local"
+    },
+    "quote_units": "decimal implied vol; rate=dividend=0",
+    "repricing": {
+      "tested_instruments": 36,
+      "maturities_years": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "normalized_strikes": [
+        70.0,
+        81.0,
+        92.5,
+        104.0,
+        115.0,
+        126.0,
+        137.5,
+        149.0,
+        160.0
+      ],
+      "max_abs_price_error_points": 0.0005040250193664164,
+      "max_abs_implied_vol_error_bp": 0.1356516938447183,
+      "tolerance_implied_vol_bp": 5.0,
+      "invalid_implied_vol_count": 0,
+      "passed": true,
+      "coverage_note": "Selected strikes and maturities, not a check of every CSV quote or a global calibration certificate."
+    },
+    "boundary_evaluations_before_fhc": {
+      "evaluated_points": 3358926,
+      "outside_quote_strikes": 44477,
+      "before_first_expiry": 14690
+    }
+  },
+  "volatility_selection": {
+    "model": "dupire_demo",
+    "deformation_space": "local",
+    "surface_spot": 100.0
+  },
+  "section4": {
+    "status": "dupire_calibrated_to_declared_synthetic_implied_surface",
+    "initial_price": 0.915192967060933,
+    "volatility_model": {
+      "model": "Dupire local volatility, not stochastic local volatility",
+      "source": {
+        "kind": "synthetic_SSVI_example_not_market_data",
+        "file_name": "synthetic_dupire_surface.csv",
+        "sha256": "11b1436fc290137707870d6f895ddbad601a9ed6b5b7a0f6c4f6524f195bc891",
+        "quote_rows": 2178,
+        "quoted_spot": 100.0,
+        "engine_spot": 100.0,
+        "rates_assumption": "r=q=0",
+        "theta": "0.04*T+0.02*(1-exp(-T))",
+        "rho": -0.45,
+        "phi": 0.8,
+        "spot": 100.0,
+        "SSVI_sufficient_butterfly_bound_values_at_T5": [
+          0.25504367962962127,
+          0.204034943703697
+        ],
+        "bounds_apply_to": "analytic source smile on0<T<=5, not automatically to its interpolating spline"
+      },
+      "spot": 100.0,
+      "rates_assumption": "r=q=0",
+      "surface_coordinates": "T, k=ln(K/F(T)); here F(T)=spot because r=q=0",
+      "interpolator": "RectBivariateSpline cubic total variance, s=0; not a guaranteed arbitrage-free fit",
+      "fixed_time_evaluation": "Exact tensor contraction to univariate B-splines; LRU2048; no extra spatial interpolation",
+      "maturity_range": [
+        0.01,
+        5.0
+      ],
+      "log_moneyness_range": [
+        -3.000000000000001,
+        3.0000000000000018
+      ],
+      "normalized_spot_range": [
+        4.978706836786389,
+        2008.5536923187703
+      ],
+      "nodes": [
+        18,
+        121
+      ],
+      "boundary_policy": {
+        "short_time": "w(t,k)=t*w(Tmin,k)/Tmin; exact local-vol t=0 limit",
+        "long_time": "reject t>Tmax",
+        "wings": "freeze LOCAL vol at nearest log-moneyness boundary"
+      },
+      "denominator_floor_rejection_not_clipping": 1e-08,
+      "validation": {
+        "status": "passed_finite_dense_grid_not_global_proof",
+        "tested_points": 144996,
+        "min_calendar_derivative_wT": 0.0320114129181961,
+        "min_butterfly_denominator": 0.43869209788266306,
+        "max_butterfly_denominator": 1.1605832372700156,
+        "min_local_vol": 0.169384785286005,
+        "max_local_vol": 0.5836739897308664,
+        "max_total_variance_node_interpolation_error": 2.220446049250313e-16
+      },
+      "caveat": "Dense-grid checks do not prove global arbitrage absence; boundary continuation may alter repricing and must be tested.",
+      "deformation_space": "local"
+    },
+    "figure_suffix": "dupire_demo",
+    "output_directory": "section4_dupire_demo",
+    "figure_label": "DUPIRE ON A SYNTHETIC SURFACE - not the paper's Eurostoxx data",
+    "qstar_decimal_vega_per_unit_notional": 0.010293227030463403,
+    "qstar_pilot_paths": 10000,
+    "qstar_pilot_seed": 4551544,
+    "constant_parallel_only_bp": {
+      "mean": 139.53893123554934,
+      "standard_error": 0.7983145549304967,
+      "ci95_low": 137.97423470788556,
+      "ci95_high": 141.10362776321313,
+      "n": 10000,
+      "median": 106.58715881916703,
+      "p95": 293.37008647200275
+    },
+    "constant_parallel_skew_bp": {
+      "mean": 161.25961780695837,
+      "standard_error": 1.2770608405401989,
+      "ci95_low": 158.7565785594996,
+      "ci95_high": 163.76265705441716,
+      "n": 10000,
+      "median": 100.11010661425053,
+      "p95": 419.8590988428874
+    },
+    "linear_impact_parallel_skew_bp": {
+      "mean": 566.7486521848521,
+      "standard_error": 7.295079101118096,
+      "ci95_low": 552.4502971466605,
+      "ci95_high": 581.0470072230436,
+      "n": 10000,
+      "median": 303.95036198973685,
+      "p95": 1913.8646037881506
+    },
+    "duration_years": {
+      "mean": 2.6642,
+      "standard_error": 0.017968197505931448,
+      "ci95_low": 2.6289823328883744,
+      "ci95_high": 2.699417667111626,
+      "n": 10000,
+      "median": 2.0,
+      "p95": 5.0
+    },
+    "published_reference_not_calibration_targets": {
+      "parallel_only_bp": 86,
+      "parallel_skew_bp": 91,
+      "linear_impact_tail_above_342bp_percent": 1.5
+    },
+    "proxy_tail_above_342bp_percent": 45.85,
+    "out_of_domain_path_time_count": 0,
+    "max_post_update_scenario_residual": 4.1226787608761306e-17,
+    "threshold_breaches_after_update": 0,
+    "dupire_boundary_evaluations_total": {
+      "evaluated_points": 806237272,
+      "outside_quote_strikes": 10353547,
+      "before_first_expiry": 676272
+    },
+    "algorithm2_exports": {
+      "directory": "C:\\Users\\macri\\Desktop\\vega_hedge_main\\replica_e_ottimizzazione_quadratica\\risultati\\complete_replication",
+      "metadata": "algorithm2_metadata.json",
+      "run_index": "mc_runs.csv",
+      "trace_scope": "main",
+      "csv_compression": "gzip",
+      "simulation_count": 87
+    }
+  },
+  "elapsed_seconds": 1936.8392990999855
+}

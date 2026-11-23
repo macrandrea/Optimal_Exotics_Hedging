@@ -1,0 +1,5 @@
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+# Extraction of source figures when an original PDF is supplied.
+PyMuPDF>=1.23
